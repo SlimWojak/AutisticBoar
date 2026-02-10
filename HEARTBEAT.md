@@ -10,6 +10,7 @@ python3 -m lib.guards.killswitch
 - If status is `ACTIVE` → reply HEARTBEAT_OK immediately. Do nothing else.
 
 ## 2. State Orientation
+- Read `state/checkpoint.md` for strategic context from the last heartbeat.
 - Read `state/latest.md` for current positions and recent activity.
 - Read `state/state.json` for exact portfolio numbers.
 
@@ -105,7 +106,22 @@ python3 -m lib.skills.bead_write --type entry --data '<JSON>'
 
 ## 14. Report
 - If any trade was executed, position exited, or notable event occurred:
-  → Send concise Telegram summary to G.
+  → Send Telegram summary to G with appropriate tier prefix (🟢/🟡/🔴).
   → Lead with action, follow with why, end with numbers.
 - If nothing happened:
   → Reply HEARTBEAT_OK
+
+## 15. Write Checkpoint (ALWAYS — even on HEARTBEAT_OK)
+Write `state/checkpoint.md` with your current strategic thinking.
+This is what the NEXT spawn reads for orientation. Keep it to 5 lines:
+
+```markdown
+thesis: "<what you're watching, what you expect to happen>"
+regime: <green|yellow|red|halted>
+open_positions: <N>
+next_action: "<what the next heartbeat should prioritize>"
+concern: "<any system issue, API degradation, or market worry — or 'none'>"
+```
+
+This checkpoint persists your strategic context across spawns.
+Without it, the next spawn starts cold. Write it EVERY cycle.

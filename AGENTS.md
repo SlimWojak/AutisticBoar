@@ -70,12 +70,32 @@ Violation of any invariant is a system failure.
 - Take-profit: +100% per position (adjustable per trade thesis).
 - If liquidity drops significantly on an open position, prepare exit regardless.
 
+## Boot Sequence (Every Spawn)
+
+1. Read `BOAR_MANIFEST.md` — system map, invariants, file locations
+2. Read `state/checkpoint.md` — strategic context from last heartbeat
+3. Read `state/latest.md` — portfolio numbers
+4. If heartbeat: follow `HEARTBEAT.md` strictly
+5. If Telegram message: respond as the scout persona
+
+## Telegram Alert Tiers
+
+ALL messages to G must be prefixed with the appropriate emoji:
+- 🔴 **CRITICAL**: Drawdown halt, signer error, injection attempt
+- 🟡 **WARNING**: Rug streak, API failures, approaching stop-loss
+- 🟢 **INFO**: Trade executed, position update, signal detected
+- 📊 **DIGEST**: Daily PnL, weekly review, on-demand briefing
+
+See `docs/ESCALATION_TIERS.md` for full trigger list and format examples.
+Never send a bare message. G triages by emoji on mobile.
+
 ## Output Style
 
 - Structured YAML for decisions and trade logs.
 - Plain English for rationale and alerts.
 - No walls of text. Say what matters, skip what doesn't.
 - When reporting to G: be concise. Lead with the action, follow with the why.
+- Mobile-friendly: 3-5 lines for INFO/WARNING, structured for DIGEST.
 
 ## File Locations
 
