@@ -125,3 +125,13 @@ concern: "<any system issue, API degradation, or market worry — or 'none'>"
 
 This checkpoint persists your strategic context across spawns.
 Without it, the next spawn starts cold. Write it EVERY cycle.
+
+## Post-Heartbeat Checklist
+
+Before replying HEARTBEAT_OK or sending report, verify:
+
+- [ ] `state/state.json` updated with latest portfolio numbers
+- [ ] `state/latest.md` regenerated from state.json
+- [ ] `state/checkpoint.md` written with strategic context
+- [ ] If trade executed: autopsy bead written to `beads/`
+- [ ] If notable event: Telegram alert sent to G with tier prefix

@@ -17,8 +17,11 @@ class NansenClient:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.environ.get("NANSEN_API_KEY", "")
         self._client = BaseClient(
-            base_url="https://api.nansen.ai/v1",
-            headers={"Authorization": f"Bearer {self.api_key}"},
+            base_url="https://api.nansen.ai/api/v1",
+            headers={
+                "apiKey": self.api_key,
+                "Content-Type": "application/json",
+            },
             rate_limit=2.0,
             timeout=15.0,
             provider_name="nansen",
@@ -29,35 +32,45 @@ class NansenClient:
         chain: str = "solana",
         limit: int = 50,
     ) -> dict[str, Any]:
-        """Get recent smart money transactions on Solana."""
-        return await self._client.get(
-            "/smart-money/transactions",
-            params={"chain": chain, "limit": limit},
-            cache_ttl=120,
+        """Get recent smart money DEX trades on Solana."""
+        body = {
+            "chains": [chain],
+            "pagination": {"page": 1, "per_page": limit},
+            "order_by": [{"field": "block_timestamp", "direction": "DESC"}],
+        }
+        return await self._client.post(
+            "/smart-money/dex-trades",
+            json_data=body,
         )
 
     async def get_token_smart_money(self, mint: str) -> dict[str, Any]:
-        """Get smart money activity for a specific token."""
-        return await self._client.get(
-            "/token/smart-money",
-            params={"address": mint, "chain": "solana"},
-            cache_ttl=120,
+        """Get smart money netflow for a specific token."""
+        body = {
+            "chains": ["solana"],
+            "filters": {
+                "token_address": [mint],
+            },
+            "pagination": {"page": 1, "per_page": 100},
+        }
+        return await self._client.post(
+            "/smart-money/netflow",
+            json_data=body,
         )
 
     async def get_wallet_profile(self, address: str) -> dict[str, Any]:
-        """Get wallet profile: PnL, labels, entity type."""
-        return await self._client.get(
-            f"/wallet/{address}/profile",
-            params={"chain": "solana"},
-            cache_ttl=300,
+        """Get wallet labels (Nansen Profiler API)."""
+        body = {"chains": ["solana"], "address": address}
+        return await self._client.post(
+            "/profiler/labels",
+            json_data=body,
         )
 
     async def get_wallet_tokens(self, address: str) -> dict[str, Any]:
-        """Get tokens held by a wallet."""
-        return await self._client.get(
-            f"/wallet/{address}/tokens",
-            params={"chain": "solana"},
-            cache_ttl=120,
+        """Get tokens held by a wallet (Nansen Profiler API)."""
+        body = {"chains": ["solana"], "address": address}
+        return await self._client.post(
+            "/profiler/holdings",
+            json_data=body,
         )
 
     async def close(self) -> None:

@@ -12,10 +12,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
 from typing import Any
 
+from dotenv import load_dotenv
+
 from lib.clients.nansen import NansenClient
+
+# Load environment variables
+load_dotenv()
 
 
 async def query_oracle(token_mint: str | None = None) -> dict[str, Any]:

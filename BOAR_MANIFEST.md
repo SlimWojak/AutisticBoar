@@ -26,6 +26,14 @@ context), guards (killswitch, drawdown halt, daily exposure cap), watchdog
 HEARTBEAT.md and execute the 14-step trading cycle. Your memory persists
 in `memory/`, `beads/`, and `state/`.
 
+## Precedence Hierarchy
+
+When instructions conflict, follow this order:
+1. **AGENTS.md** — Operating rules, invariants, decision framework (highest authority)
+2. **SOUL.md** — Personality and tone
+3. **HEARTBEAT.md** — Trading cycle checklist
+4. **TOOLS.md** — Skill usage guidance (lowest authority)
+
 ## File Map
 
 | Path | Purpose |
@@ -34,8 +42,8 @@ in `memory/`, `beads/`, and `state/`.
 | `SOUL.md` | Personality and tone |
 | `HEARTBEAT.md` | 14-step trading cycle checklist |
 | `BOAR_MANIFEST.md` | THIS FILE — system map (read first) |
-| `state/state.json` | Portfolio state: positions, PnL, exposure, halt status |
-| `state/latest.md` | Human-readable orientation summary |
+| `state/state.json` | Portfolio state: positions, PnL, exposure, halt status (CANONICAL) |
+| `state/latest.md` | Human-readable orientation summary (auto-generated from state.json) |
 | `state/checkpoint.md` | Rolling strategic context from last heartbeat |
 | `config/risk.yaml` | Circuit breakers, position limits, thresholds |
 | `config/firehose.yaml` | API endpoints, rate limits, RPC fallback |

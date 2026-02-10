@@ -34,7 +34,7 @@ birdeye:
 
 # Nansen
 nansen:
-  base_url: "https://api.nansen.ai/v1"
+  base_url: "https://api.nansen.ai/api/v1"
   rate_limit_per_second: 2
   cache_ttl_seconds: 120
 
