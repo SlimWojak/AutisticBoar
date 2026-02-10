@@ -58,7 +58,7 @@ Reports are markdown-formatted with:
 
 ## Environment
 
-Requires `PERPLEXITY_API_KEY` in environment. The skill script will error if not set.
+Requires `PERPLEXITY_KEY` in environment (also accepts `PERPLEXITY_API_KEY` as fallback). The skill script will error if not set.
 
 ## Dependencies
 

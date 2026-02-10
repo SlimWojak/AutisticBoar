@@ -19,10 +19,11 @@ except ImportError:
 
 def query_perplexity(prompt: str, model: str = "sonar") -> dict:
     """Query Perplexity API with the given prompt."""
-    api_key = os.getenv("PERPLEXITY_API_KEY")
+    # Check for PERPLEXITY_KEY first (standard format), fallback to PERPLEXITY_API_KEY
+    api_key = os.getenv("PERPLEXITY_KEY") or os.getenv("PERPLEXITY_API_KEY")
     if not api_key:
         return {
-            "error": "PERPLEXITY_API_KEY not set in environment",
+            "error": "PERPLEXITY_KEY (or PERPLEXITY_API_KEY) not set in environment",
             "success": False
         }
     
