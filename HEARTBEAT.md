@@ -154,13 +154,14 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.warden_check
 - Regenerate `state/latest.md` summary.
 
 ## 14. Report
-- **ALWAYS send a Telegram message** (day 1 testing mode).
+- **NEVER reply with just "HEARTBEAT_OK"** — always use the template format below (day 1 testing).
 - If any trade was executed, position exited, or notable event occurred:
   → Send full template (🟢 ENTRY / 🟢 EXIT / 🟡 WARNING / 🔴 CRITICAL).
 - If dry-run cycle completed and `dry_run_cycles_completed >= dry_run_target_cycles`:
   → Send 📊 DIGEST to G with sample scored opportunities from the 10 cycles.
 - If nothing happened (no signals, no positions, no alerts):
-  → Send: `🟢 HB #{cycle} | {pot} SOL | 0 pos | no signals | dry-run {n}/10`
+  → Send exactly: `🟢 HB #{cycle} | {pot} SOL | 0 pos | no signals | dry-run {n}/10`
+  → Example: `🟢 HB #1 | 14.0 SOL | 0 pos | no signals | dry-run 1/10`
 
 ## 15. Write Checkpoint (ALWAYS — even on HEARTBEAT_OK)
 Write `state/checkpoint.md` with your current strategic thinking.
