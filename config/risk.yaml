@@ -1,0 +1,33 @@
+# AutistBoar — Risk Configuration
+# Read by Python guards at runtime.
+
+# Portfolio limits
+portfolio:
+  starting_balance_sol: 0.0    # Set on first fund (SOL)
+  max_concurrent_positions: 5
+  daily_exposure_pct: 30       # Max 30% of pot deployed per day (INV-DAILY-EXPOSURE-30)
+  drawdown_halt_pct: 50        # Halt if pot < 50% of starting (INV-DRAWDOWN-50)
+  drawdown_halt_hours: 24      # Hours to halt after drawdown trigger
+
+# Per-trade limits
+trade:
+  auto_max_usd: 50             # Auto-execute up to this amount
+  convergence_max_usd: 100     # 2+ signals required up to this amount
+  human_gate_usd: 100          # Above this → alert G, await approval (INV-HUMAN-GATE-100)
+  slippage_max_pct: 3          # Jupiter slippage parameter
+  stop_loss_pct: 20            # Exit if position drops 20%
+  take_profit_pct: 100         # Exit if position gains 100% (adjustable per trade)
+
+# Rug Warden thresholds
+rug_warden:
+  min_liquidity_usd: 10000     # Reject if liquidity < $10k
+  max_holder_concentration_pct: 80  # Reject if top 10 wallets > 80%
+  min_token_age_seconds: 300   # Warn if token < 5 min old
+  reject_mutable_mint: true    # Reject if mint/freeze authority is mutable
+  reject_unlocked_lp: false    # Warn (not reject) if LP not locked/burned
+
+# Circuit breakers
+circuit_breakers:
+  consecutive_losses: 3        # After 3 consecutive losses → reduce size 50%
+  daily_loss_pct: 10           # If daily loss > 10% of pot → halt for rest of day
+  rpc_failures: 5              # After 5 consecutive RPC failures → alert G

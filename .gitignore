@@ -1,0 +1,52 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Runtime state (gitignored on VPS, tracked locally as templates)
+state/state.json
+beads/*.md
+beads/*.json
+memory/*.md
+!memory/.gitkeep
+!beads/.gitkeep
+
+# Edge Bank database
+*.db
+*.db-journal
+
+# Sentence-transformers model cache
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys (never committed)
+keys/
+*.key
+*.pem
+*.seed
+
+# OpenClaw (lives in ~/.openclaw/, not here)
+.openclaw/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+/tmp/
