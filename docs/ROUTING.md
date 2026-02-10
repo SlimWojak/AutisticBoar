@@ -3,65 +3,59 @@
 ## Current Setup
 
 ### Interactive Chat (Telegram)
-**Session:** main (this conversation)  
+**Session:** main  
 **Model:** `openrouter/anthropic/claude-sonnet-4.5`  
 **Use Case:** G's interactive assistant, personality-driven responses, complex reasoning  
 **Cost:** ~$3/1M input tokens
 
-### Autonomous Heartbeat (Cron)
-**Session:** isolated (spawned every 10 minutes)  
+### Autonomous Heartbeat (Native)
+**Session:** main (shared with chat, heartbeat polls inject into same context)  
 **Model:** `openrouter/deepseek/deepseek-chat`  
-**Fallback:** None configured (single model, fail if unavailable)  
+**Schedule:** Every 10 minutes  
 **Use Case:** Execute HEARTBEAT.md checklist, structured decision-making  
 **Cost:** ~$0.30/1M input tokens, ~$0.12/1M output tokens (10x cheaper than Sonnet)
 
-## Cron Configuration
+## Native Heartbeat Configuration
+
+Configured via `agents.defaults.heartbeat` in openclaw.json:
 
 ```yaml
-Schedule: Every 10 minutes (600,000ms)
-Payload: agentTurn with HEARTBEAT.md prompt
-Model: deepseek/deepseek-chat
-Timeout: 300 seconds
-Delivery: none (no Telegram announcements unless alert)
+every: "10m"
+model: "openrouter/deepseek/deepseek-chat"
+session: "main"
+target: "none"  # No delivery unless alerts
+prompt: "Read HEARTBEAT.md..."
+ackMaxChars: 100  # Suppress long HEARTBEAT_OK responses
 ```
-
-Job ID: `39f92597-872d-493e-b847-95fe8929ea0c`
 
 ## Why This Split?
 
 - **Sonnet** excels at personality, wit, complex multi-step reasoning → ideal for chat
-- **Qwen 2.5 72B** is cheap, fast, good at structured tasks → ideal for HEARTBEAT.md execution
-- **Cost savings:** ~$2.85/1M tokens saved per heartbeat cycle
-- **Isolation:** Heartbeat failures don't pollute main chat session
+- **DeepSeek** is cheap, fast, good at structured tasks → ideal for HEARTBEAT.md execution
+- **Cost savings:** ~$2.70/1M tokens saved per heartbeat cycle
+- **Shared session:** Heartbeat updates persist in chat history (checkpoint.md visible to both)
 
 ## Fallback Strategy
 
-If Qwen fails, the heartbeat job will error and retry on next 10-min cycle. No automatic fallback to prevent accidental Sonnet bleed. Monitor via:
-
-```bash
-openclaw cron runs --jobId 980bf93d-31a2-4cae-9379-8e881e420485 --limit 10
-```
+If DeepSeek fails on heartbeat, OpenClaw skips that cycle and retries in 10 minutes. No automatic fallback to prevent Sonnet bleed.
 
 ## Changing Models
 
-To update the heartbeat model, delete and recreate the job (update not supported for payload fields):
-
-```bash
-openclaw cron remove --jobId 39f92597-872d-493e-b847-95fe8929ea0c
-openclaw cron add --job '{...}' # with new model
-```
-
-To update the main agent model, edit `~/.openclaw/openclaw.json`:
+To update the heartbeat model, edit `~/.openclaw/openclaw.json`:
 
 ```json
 "agents": {
   "defaults": {
-    "model": {
-      "primary": "openrouter/anthropic/claude-sonnet-4.5"
+    "heartbeat": {
+      "model": "openrouter/zhipu/glm-4-flash"  // Or any model in the allowlist
     }
   }
 }
 ```
+
+Then apply: `openclaw gateway config.apply`
+
+To update the chat model, edit `agents.defaults.model.primary` in the same file.
 
 ## Cost Tracking
 

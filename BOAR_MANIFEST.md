@@ -53,7 +53,7 @@ When instructions conflict, follow this order:
 | `lib/` | Python execution layer (clients, guards, signer, edge bank) |
 | `killswitch.txt` | If this file exists → halt everything |
 
-## The Law (7 Invariants)
+## The Law (8 Invariants)
 
 | # | ID | Rule |
 |---|-----|------|
@@ -64,6 +64,7 @@ When instructions conflict, follow this order:
 | 5 | INV-KILLSWITCH | killswitch.txt exists → HEARTBEAT_OK immediately |
 | 6 | INV-DAILY-EXPOSURE-30 | Max 30% of pot deployed per day |
 | 7 | INV-NO-MARKETPLACE | Zero ClawHub/marketplace skills. Custom only. |
+| 8 | INV-BRAVE-WHITELIST | Brave search restricted to approved tech docs. Enforced in code. |
 
 ## API Inventory
 

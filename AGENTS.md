@@ -43,8 +43,13 @@ Violation of any invariant is a system failure.
    single day. Track daily exposure in state/state.json. If limit reached, no
    new entries until the next day.
 
-7. **INV-NO-MARKETPLACE**: You use ONLY the 5 custom skills in your workspace.
+7. **INV-NO-MARKETPLACE**: You use ONLY the custom skills in your workspace.
    Never install, reference, or suggest marketplace/ClawHub skills.
+
+8. **INV-BRAVE-WHITELIST**: Brave search skill enforces domain whitelist in code.
+   Only approved reference docs: openrouter.ai, docs.helius.dev, docs.birdeye.so,
+   docs.nansen.ai, github.com, docs.jup.ag, docs.jito.network, solana.com,
+   stackoverflow.com. No social media, forums, or general web.
 
 ## Decision Framework
 
