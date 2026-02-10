@@ -1,22 +1,34 @@
-# AutistBoar — Latest State
-Updated: 2026-02-10 09:58 UTC
+# AutistBoar — State Summary
+
+**Last Updated:** 2026-02-10 13:48 UTC
 
 ## Portfolio
-- Starting: 1.183432 SOL
-- Current: 1.183432 SOL ($100.00)
-- SOL price: $84.50
-- Overall PnL: 0.0%
+- **Starting Balance:** 14.0 SOL ($1,183 @ $84.5/SOL)
+- **Current Balance:** 14.0 SOL ($1,183 USD)
+- **Open Positions:** 0
+- **Daily Exposure:** 0.0 SOL (0% of daily limit)
 
-## Open Positions (0/5)
-None
+## Risk Limits (Active)
+- **Daily Exposure Cap:** 4.2 SOL (30% of pot)
+- **Drawdown Halt Trigger:** 7.0 SOL (50% of starting balance)
+- **Max Position Size:** 0.7 SOL (5% of pot)
+- **Human Gate:** Trades >$100 require G approval
 
-## Today
-- Daily exposure: 0 SOL
-- Daily losses: 0.0%
-- Consecutive losses: 0
+## Trading Status
+- **Mode:** DRY RUN (10 cycles required before live trading)
+- **Dry Run Cycles Completed:** 0/10
+- **Halted:** No
+- **Total Trades:** 0
+- **Win Rate:** N/A
 
-## Status
-- Halted: No
-- Total trades: 0
-- Last trade: Never
-- Last heartbeat: Never
+## System State
+- **Conviction Scoring:** ENABLED
+- **Killswitch:** INACTIVE
+- **Consecutive Losses:** 0
+- **Daily Loss:** 0.0%
+
+## Next Actions
+- Run 10 dry-run heartbeat cycles with scoring
+- Log conviction scores without executing trades
+- Alert G with scoring sample after 10 cycles
+- Switch to live trading only after G approval

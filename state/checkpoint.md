@@ -1,5 +1,5 @@
-thesis: "Skills execution fixed. All systems operational. Zero signals detected (oracle and narrative both clean). Markets quiet."
-regime: green
+thesis: "Conviction scoring system implemented. 10 dry-run cycles required to validate scoring produces sensible output on real signals before live trading."
+regime: yellow
 open_positions: 0
-next_action: "Continue monitoring. Do not trade until 2+ signal convergence."
-concern: "none"
+next_action: "Run dry-run heartbeat cycles (0/10 complete). Score real signals but do NOT execute. Log breakdown for G review."
+concern: "none — system ready for dry-run validation"

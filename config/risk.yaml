@@ -3,7 +3,7 @@
 
 # Portfolio limits
 portfolio:
-  starting_balance_sol: 0.0    # Set on first fund (SOL)
+  starting_balance_sol: 14.0   # Funded 2026-02-10
   max_concurrent_positions: 5
   daily_exposure_pct: 30       # Max 30% of pot deployed per day (INV-DAILY-EXPOSURE-30)
   drawdown_halt_pct: 50        # Halt if pot < 50% of starting (INV-DRAWDOWN-50)
@@ -15,8 +15,41 @@ trade:
   convergence_max_usd: 100     # 2+ signals required up to this amount
   human_gate_usd: 100          # Above this → alert G, await approval (INV-HUMAN-GATE-100)
   slippage_max_pct: 3          # Jupiter slippage parameter
-  stop_loss_pct: 20            # Exit if position drops 20%
-  take_profit_pct: 100         # Exit if position gains 100% (adjustable per trade)
+  max_position_pct: 5          # Maximum 5% of pot per trade
+
+# Conviction scoring
+conviction:
+  # Signal weights (max points per signal)
+  weights:
+    smart_money_oracle: 40     # +15 per whale, cap 40 (3+ whales)
+    narrative_hunter: 30       # Volume spike >5x + KOL detection, decay after 30min
+    rug_warden: 20             # Binary: PASS = +20, FAIL = instant veto
+    edge_bank: 10              # Similar setup match >70% from past winners
+  
+  # Thresholds
+  thresholds:
+    auto_execute: 85           # ≥85: auto-execute (within existing tier gates)
+    watchlist: 60              # 60-84: log as watchlist, alert G with breakdown
+    discard: 60                # <60: discard, no alert
+  
+  # Position sizing parameters
+  sizing:
+    base_multiplier: 0.01      # (score/100) × (pot × 0.01)
+    # volatility_factor calculated dynamically, defaults to 1.0
+
+# Exit tiers (applied in watchdog step)
+exits:
+  take_profit:
+    tier_1_pct: 50             # Exit 50% position at 2x
+    tier_1_multiple: 2.0
+    tier_2_pct: 30             # Exit 30% position at 5x
+    tier_2_multiple: 5.0
+    trailing_stop_pct: 20      # Trail remainder at 20% below peak
+  
+  stop_loss_pct: 20            # Exit 100% at -20% (unchanged from trade.stop_loss_pct)
+  
+  time_decay:
+    no_momentum_minutes: 60    # If no price movement after 60min → exit
 
 # Rug Warden thresholds
 rug_warden:

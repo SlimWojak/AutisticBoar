@@ -8,6 +8,14 @@ Do not improvise. Do not add steps. This is the cycle.
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m <module>
 ```
 
+## 0. Dry-Run Mode Check
+- Read `state/state.json` and check `dry_run_mode` field.
+- If `dry_run_mode: true`:
+  - Run all steps normally but DO NOT execute trades (skip step 12).
+  - Log conviction scores and recommendations to console.
+  - Increment `dry_run_cycles_completed` in state.json.
+  - If `dry_run_cycles_completed >= dry_run_target_cycles`: alert G with 📊 DIGEST showing sample scores.
+
 ## 1. Killswitch Check
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.killswitch
@@ -25,7 +33,7 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.drawdown
 ```
 - If status is `HALTED` → reply HEARTBEAT_OK. Do nothing else.
 - If `alert: true` → send Telegram message to G:
-  "DRAWDOWN HALT: pot at {current_pct}% of starting. Trading halted for 24h."
+  "🔴 CRITICAL: DRAWDOWN HALT — pot at {current_pct}% of starting. Trading halted for 24h."
 
 ## 4. Risk Limits Check (INV-DAILY-EXPOSURE-30)
 ```bash
@@ -39,21 +47,24 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.risk
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.oracle_query
 ```
 - Review whale accumulation signals.
-- Note any tokens with 3+ independent wallets buying.
+- Extract: number of distinct whales accumulating per token.
 
 ## 6. Narrative Hunter
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.narrative_scan
 ```
 - Review social + onchain momentum.
-- Cross-reference with oracle signals from step 5.
+- Extract: volume spike multiple, KOL detection, narrative age.
 
-## 7. Position Watchdog
+## 7. Position Watchdog (Exit Tier Logic)
 - For each open position in state.json:
-  - Check current price vs entry price.
-  - If stop-loss triggered (-20%): prepare exit.
-  - If take-profit triggered (+100%): prepare exit.
-  - If liquidity dropped significantly: prepare exit.
+  - Check current price vs entry price and peak price.
+  - **Stop-loss (-20%):** Exit 100% immediately.
+  - **Take-profit tier 1 (+100% / 2x):** Exit 50% of position.
+  - **Take-profit tier 2 (+400% / 5x):** Exit 30% of remaining position.
+  - **Trailing stop:** If position is in profit and drops 20% from peak → exit remainder.
+  - **Time decay:** If no price movement >5% after 60min → exit.
+  - **Liquidity drop:** If liquidity drops >50% from entry → prepare exit.
 
 ## 8. Execute Exits
 - For any positions flagged for exit in step 7:
@@ -65,41 +76,73 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.execute_swap
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write --type exit --data '<JSON>'
 ```
 
-## 9. Evaluate New Opportunities
-- Cross-reference oracle signals (step 5) with narrative signals (step 6).
-- Apply conviction framework:
-  - 2+ independent signals → consider entry
-  - 1 signal only → document, do not trade
-  - Conflicting signals → stand down
+## 9. Conviction Scoring (Replaces Old "Evaluate Opportunities")
+- For each candidate token detected in steps 5-6:
+  - Gather signal inputs:
+    - `smart_money_whales`: count from step 5
+    - `narrative_volume_spike`: multiple from step 6
+    - `narrative_kol_detected`: boolean from step 6
+    - `narrative_age_minutes`: time since first detection
+    - `rug_warden_status`: from step 11 (run warden first)
+    - `edge_bank_match_pct`: from step 10 (run query first)
+  
+  - Run conviction scorer:
+    ```bash
+    cd /home/autistboar/autisticboar && .venv/bin/python3 lib/scoring.py \
+      --whales <N> \
+      --volume-spike <X> \
+      --kol \  # if detected
+      --narrative-age <MIN> \
+      --rug-warden <STATUS> \
+      --edge-match <PCT> \
+      --pot <CURRENT_SOL>
+    ```
+  
+  - Parse output: `total_score`, `breakdown`, `recommendation`, `position_size_sol`
+  
+  - **Decision logic:**
+    - `VETO`: Rug Warden FAIL → do not trade, log reason.
+    - `DISCARD` (score < 60): Ignore, no alert.
+    - `WATCHLIST` (60-84): Log with 🟢 INFO alert to G showing score breakdown.
+    - `AUTO_EXECUTE` (≥85): Proceed to step 12 (subject to tier gates + dry-run check).
 
-## 10. Edge Bank Query (Before Any Entry)
+## 10. Edge Bank Query (Before Scoring)
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_query --context '<SIGNAL_SUMMARY>'
 ```
-- Review: "Last N similar patterns: X rugged, Y succeeded"
-- Factor historical outcomes into conviction assessment.
+- Extract: historical match percentage for similar setups.
+- Feed this into conviction scoring as `edge_bank_match_pct`.
 
 ## 11. Pre-Trade Validation (INV-RUG-WARDEN-VETO)
 - For any candidate token:
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.warden_check --token <MINT_ADDRESS>
 ```
-- If `FAIL` → do not trade. Log reason. Move to next candidate.
-- If `WARN` → require 3+ signal convergence to proceed.
-- If `PASS` → proceed to execution.
+- Extract: `PASS`, `WARN`, or `FAIL`.
+- Feed this into conviction scoring as `rug_warden_status`.
+- **If FAIL:** Conviction scorer returns VETO → do not trade.
 
-## 12. Execute Entries
-- Determine trade size based on conviction:
-  - ≤$50 → auto-execute
-  - $50-$100 → require 2+ signal convergence
-  - >$100 → send Telegram alert to G, DO NOT execute (INV-HUMAN-GATE-100)
-```bash
-cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.execute_swap --direction buy --token <MINT> --amount <SOL_AMOUNT>
-```
-- Write autopsy bead:
-```bash
-cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write --type entry --data '<JSON>'
-```
+## 12. Execute Entries (Subject to Dry-Run + Tier Gates)
+- **IF dry_run_mode is true:** Log the trade that WOULD execute, but DO NOT call execute_swap.
+- **ELSE (live trading):**
+  - Check tier gates:
+    - Position size >$100 equivalent → send 🟡 WARNING to G with thesis, await approval (INV-HUMAN-GATE-100). DO NOT execute until G responds.
+    - Position size ≤$100 → auto-execute.
+  
+  - Execute:
+    ```bash
+    cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.execute_swap \
+      --direction buy \
+      --token <MINT> \
+      --amount <SOL_AMOUNT>
+    ```
+  
+  - Write autopsy bead:
+    ```bash
+    cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write \
+      --type entry \
+      --data '<JSON_WITH_CONVICTION_BREAKDOWN>'
+    ```
 
 ## 13. Update State
 - Update `state/state.json` with:
@@ -107,12 +150,15 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write -
   - Updated PnL
   - Daily exposure
   - Last heartbeat timestamp
+  - If dry-run: increment `dry_run_cycles_completed`
 - Regenerate `state/latest.md` summary.
 
 ## 14. Report
 - If any trade was executed, position exited, or notable event occurred:
   → Send Telegram summary to G with appropriate tier prefix (🟢/🟡/🔴).
   → Lead with action, follow with why, end with numbers.
+- If dry-run cycle completed and `dry_run_cycles_completed >= dry_run_target_cycles`:
+  → Send 📊 DIGEST to G with sample scored opportunities from the 10 cycles.
 - If nothing happened:
   → Reply HEARTBEAT_OK
 
@@ -140,3 +186,4 @@ Before replying HEARTBEAT_OK or sending report, verify:
 - [ ] `state/checkpoint.md` written with strategic context
 - [ ] If trade executed: autopsy bead written to `beads/`
 - [ ] If notable event: Telegram alert sent to G with tier prefix
+- [ ] If dry-run cycle: `dry_run_cycles_completed` incremented
