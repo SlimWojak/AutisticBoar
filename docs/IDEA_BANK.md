@@ -13,6 +13,7 @@ Future enhancements and extensions for AutistBoar. Items are PARKED until core t
 | 5 | 2026-02-11 | Roundtable synthesis in daily digest — not just "what happened" but "what cross-signals emerged across all strategies today." Curator pattern. | CTO Claude | PARKED |
 | 6 | 2026-02-11 | Multi-strategy shared context — when running memecoins + predictions + perps, each strategy writes to its own subdirectory. Strategist (Sonnet) reads across all for cross-signals. | CTO Claude | PARKED |
 | 7 | 2026-02-11 | ChronoBets prediction market skill — place small USDC bets on Pyth oracle markets (BTC/ETH/SOL) as conviction calibration. Prepare/submit pattern fits Blind KeyMan. | G + CTO Claude | PARKED — after core trading loop validated |
+| 8 | 2026-02-10 | Structured reasoning chains at decision time, not just post-trade autopsy. Strategist (Sonnet) outputs logic tree with every trade decision, persisted in bead for fast human review. Pattern: evidence bundle → reasoning chain → decision → G audits the logic, not the trade. | G | PARKED |
 
 ## Selection Criteria
 
