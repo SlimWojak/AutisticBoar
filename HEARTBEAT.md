@@ -3,9 +3,14 @@
 Follow these steps IN ORDER on every heartbeat. Do not skip steps.
 Do not improvise. Do not add steps. This is the cycle.
 
+**CRITICAL:** All commands must run from workspace root with venv active:
+```bash
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m <module>
+```
+
 ## 1. Killswitch Check
 ```bash
-python3 -m lib.guards.killswitch
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.killswitch
 ```
 - If status is `ACTIVE` → reply HEARTBEAT_OK immediately. Do nothing else.
 
@@ -16,7 +21,7 @@ python3 -m lib.guards.killswitch
 
 ## 3. Drawdown Guard (INV-DRAWDOWN-50)
 ```bash
-python3 -m lib.guards.drawdown
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.drawdown
 ```
 - If status is `HALTED` → reply HEARTBEAT_OK. Do nothing else.
 - If `alert: true` → send Telegram message to G:
@@ -24,21 +29,21 @@ python3 -m lib.guards.drawdown
 
 ## 4. Risk Limits Check (INV-DAILY-EXPOSURE-30)
 ```bash
-python3 -m lib.guards.risk
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.risk
 ```
 - If status is `BLOCKED` → no new entries this cycle. Continue to step 7 (watchdog only).
 - If warnings present → note them, reduce sizing if needed.
 
 ## 5. Smart Money Oracle
 ```bash
-python3 -m lib.skills.oracle_query
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.oracle_query
 ```
 - Review whale accumulation signals.
 - Note any tokens with 3+ independent wallets buying.
 
 ## 6. Narrative Hunter
 ```bash
-python3 -m lib.skills.narrative_scan
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.narrative_scan
 ```
 - Review social + onchain momentum.
 - Cross-reference with oracle signals from step 5.
@@ -53,11 +58,11 @@ python3 -m lib.skills.narrative_scan
 ## 8. Execute Exits
 - For any positions flagged for exit in step 7:
 ```bash
-python3 -m lib.skills.execute_swap --direction sell --token <MINT> --amount <AMOUNT>
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.execute_swap --direction sell --token <MINT> --amount <AMOUNT>
 ```
 - Write autopsy bead for each exit:
 ```bash
-python3 -m lib.skills.bead_write --type exit --data '<JSON>'
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write --type exit --data '<JSON>'
 ```
 
 ## 9. Evaluate New Opportunities
@@ -69,7 +74,7 @@ python3 -m lib.skills.bead_write --type exit --data '<JSON>'
 
 ## 10. Edge Bank Query (Before Any Entry)
 ```bash
-python3 -m lib.skills.bead_query --context '<SIGNAL_SUMMARY>'
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_query --context '<SIGNAL_SUMMARY>'
 ```
 - Review: "Last N similar patterns: X rugged, Y succeeded"
 - Factor historical outcomes into conviction assessment.
@@ -77,7 +82,7 @@ python3 -m lib.skills.bead_query --context '<SIGNAL_SUMMARY>'
 ## 11. Pre-Trade Validation (INV-RUG-WARDEN-VETO)
 - For any candidate token:
 ```bash
-python3 -m lib.skills.warden_check --token <MINT_ADDRESS>
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.warden_check --token <MINT_ADDRESS>
 ```
 - If `FAIL` → do not trade. Log reason. Move to next candidate.
 - If `WARN` → require 3+ signal convergence to proceed.
@@ -89,11 +94,11 @@ python3 -m lib.skills.warden_check --token <MINT_ADDRESS>
   - $50-$100 → require 2+ signal convergence
   - >$100 → send Telegram alert to G, DO NOT execute (INV-HUMAN-GATE-100)
 ```bash
-python3 -m lib.skills.execute_swap --direction buy --token <MINT> --amount <SOL_AMOUNT>
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.execute_swap --direction buy --token <MINT> --amount <SOL_AMOUNT>
 ```
 - Write autopsy bead:
 ```bash
-python3 -m lib.skills.bead_write --type entry --data '<JSON>'
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.bead_write --type entry --data '<JSON>'
 ```
 
 ## 13. Update State
