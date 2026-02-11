@@ -19,6 +19,30 @@ Execute in this order:
 
 ---
 
+## Critical System Knowledge: Heartbeat Architecture
+
+**OpenClaw uses NATIVE HEARTBEATS, not cron jobs.**
+
+- Configured in `~/.openclaw/openclaw.json` under `agents.defaults.heartbeat`
+- Triggers every 10 minutes automatically
+- Routes to **DeepSeek R1** (NOT Sonnet)
+- Prompt: "Read HEARTBEAT.md if it exists..."
+
+**NEVER create cron jobs for heartbeats.** Cron jobs are for reminders/wake events only.
+
+**If heartbeats seem broken:**
+1. Check `openclaw.json` config first
+2. Verify model is `openrouter/deepseek/deepseek-chat`
+3. Do NOT create a cron job as a fix
+
+Creating a cron job for heartbeats causes:
+- Redundant triggering
+- Model conflicts (cron → Sonnet, native → DeepSeek)
+- 10x cost increase
+- "Reminder content not found" errors
+
+---
+
 ## Before Answering Status Questions
 
 When G asks "how's X looking" / "what's the status" / "where are we":

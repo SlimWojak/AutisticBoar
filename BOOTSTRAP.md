@@ -31,6 +31,42 @@ This file defines how AutistBoar initializes on fresh deployment or after a hard
 
 **Boot time:** < 2 seconds for full orientation
 
+---
+
+## Heartbeat Architecture (Critical Understanding)
+
+**OpenClaw Native Heartbeat System:**
+- Configured in `~/.openclaw/openclaw.json` under `agents.defaults.heartbeat`
+- Triggers every 10 minutes automatically
+- Routes to DeepSeek R1 model (NOT Sonnet/Claude)
+- Injects prompt: "Read HEARTBEAT.md if it exists..."
+- Delivers output to Telegram when configured
+
+**NEVER create cron jobs for heartbeats.** The native system handles this.
+
+**Cron jobs are ONLY for:**
+- Scheduled reminders (e.g., "remind me in 24h")
+- Wake events
+- One-off tasks
+
+**If you think heartbeats aren't working:**
+1. Check `openclaw.json` config: `cat ~/.openclaw/openclaw.json | jq '.agents.defaults.heartbeat'`
+2. Verify model is `openrouter/deepseek/deepseek-chat`
+3. Check `every: "10m"` and `session: "main"`
+4. **Do NOT create a cron job** — this causes model selection conflicts
+
+**Heartbeat Flow:**
+```
+Native heartbeat (10min) → DeepSeek reads HEARTBEAT.md → Executes cycle → Reports to Telegram
+```
+
+**What happens if you create a cron job by mistake:**
+- Both native heartbeat AND cron fire every 10 minutes
+- Cron hits Sonnet (chat model) instead of DeepSeek
+- Sonnet gets confused (no HEARTBEAT.md context loaded)
+- Costs 10x more per cycle
+- Creates "reminder content not found" errors
+
 ## Hard Reset (wipe all state)
 
 Only execute when G explicitly requests it with `/reset` or similar clear command.

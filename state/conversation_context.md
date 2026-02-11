@@ -52,6 +52,12 @@ System will auto-trigger heartbeats every 10 minutes via cron. G can also manual
 - [02:11 UTC] Created ORIENTATION_HABITS.md — 5-file boot sequence + status check reflex + commit-as-checkpoint pattern
 - [02:11 UTC] Updated BOOTSTRAP.md to reference ORIENTATION_HABITS.md in Normal Boot sequence
 - [02:14 UTC] Tested full boot simulation — 5-file orientation sequence verified working (< 2 sec)
+- [03:48 UTC] **REGRESSION FIX:** Deleted redundant cron job (created in commit 23166e7)
+  - Root cause: Confusion between native heartbeat vs cron jobs
+  - Native heartbeat (openclaw.json) routes to DeepSeek ✅
+  - Cron job was hitting Sonnet, causing "reminder not found" errors ❌
+  - Cron jobs are for reminders/wake events ONLY, not heartbeats
+  - Updated AGENTS.md, ROUTING.md, BOOTSTRAP.md, ORIENTATION_HABITS.md with warnings
 
 ## Context for Next Spawn
 System is halfway through 10-cycle dry-run validation period. No signals detected in first 5 cycles (quiet market). Cron job now active for automated 10-minute heartbeats. Triangulation tuning v0.2 code deployed and validated. Waiting for market activity to test permission gate + red flags under real conditions.

@@ -14,6 +14,7 @@ Future enhancements and extensions for AutistBoar. Items are PARKED until core t
 | 6 | 2026-02-11 | Multi-strategy shared context — when running memecoins + predictions + perps, each strategy writes to its own subdirectory. Strategist (Sonnet) reads across all for cross-signals. | CTO Claude | PARKED |
 | 7 | 2026-02-11 | ChronoBets prediction market skill — place small USDC bets on Pyth oracle markets (BTC/ETH/SOL) as conviction calibration. Prepare/submit pattern fits Blind KeyMan. | G + CTO Claude | PARKED — after core trading loop validated |
 | 8 | 2026-02-10 | Structured reasoning chains at decision time, not just post-trade autopsy. Strategist (Sonnet) outputs logic tree with every trade decision, persisted in bead for fast human review. Pattern: evidence bundle → reasoning chain → decision → G audits the logic, not the trade. | G | PARKED |
+| 9 | 2026-02-11 | Tiered bead context loading (L0/L1/L2) — when Edge Bank beads/ hits 100+ entries, implement manual tiering: `recent.md` (last 10 trades, full detail), `monthly_summary.md` (win rate + patterns, compressed), `archive/` (30+ days old, lightly indexed). Queries hit recent first, fall back to summaries only if needed. Inspired by claw-compactor's progressive context pattern but implemented our way — no lossy compression on trade data. | G + claw-compactor review | PARKED — revisit when beads/ > 50 entries |
 
 ## Selection Criteria
 

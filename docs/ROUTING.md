@@ -35,6 +35,23 @@ ackMaxChars: 100  # Suppress long HEARTBEAT_OK responses
 - **Cost savings:** ~$2.70/1M tokens saved per heartbeat cycle
 - **Shared session:** Heartbeat updates persist in chat history (checkpoint.md visible to both)
 
+## ⚠️ CRITICAL: Do NOT Use Cron for Heartbeats
+
+**Native heartbeats** (`agents.defaults.heartbeat` in openclaw.json) are the CORRECT pattern.
+
+**Cron jobs** (`cron` tool) are for:
+- Scheduled reminders
+- Wake events  
+- One-off tasks
+
+**DO NOT use cron for heartbeats.** Creating a cron job for heartbeats causes:
+- Redundant triggering (both native + cron fire)
+- Model selection conflicts (cron hits Sonnet, not DeepSeek)
+- Increased costs (~10x per cycle)
+- Confusion and "reminder content not found" errors
+
+**Rule:** If you think heartbeats aren't working, check `openclaw.json` config first. Do NOT create a cron job.
+
 ## Fallback Strategy
 
 If DeepSeek fails on heartbeat, OpenClaw skips that cycle and retries in 10 minutes. No automatic fallback to prevent Sonnet bleed.
