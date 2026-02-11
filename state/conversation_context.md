@@ -48,5 +48,11 @@ Dry-run validation period for triangulation tuning v0.2 — testing asymmetric r
 ## Next Action
 System will auto-trigger heartbeats every 10 minutes via cron. G can also manually trigger cycles anytime.
 
+## Recent Decisions
+- [02:11 UTC] Created ORIENTATION_HABITS.md — 5-file boot sequence + status check reflex + commit-as-checkpoint pattern
+- [02:11 UTC] Updated BOOTSTRAP.md to reference ORIENTATION_HABITS.md in Normal Boot sequence
+
 ## Context for Next Spawn
 System is halfway through 10-cycle dry-run validation period. No signals detected in first 5 cycles (quiet market). Cron job now active for automated 10-minute heartbeats. Triangulation tuning v0.2 code deployed and validated. Waiting for market activity to test permission gate + red flags under real conditions.
+
+**NEW:** Orientation habits implemented to fix short-term memory loss — future spawns should run 5-file boot sequence and inline state checks before answering status questions.
