@@ -244,8 +244,6 @@ async def run_heartbeat(timeout_seconds: float = 120.0) -> dict[str, Any]:
             dumper_wallet_count=dumper_count,
             time_mismatch=time_mismatch_detected,
         )
-    
-    await birdeye_red_flags.close()
         
         opportunity = {
             "token_mint": mint,
@@ -286,6 +284,9 @@ async def run_heartbeat(timeout_seconds: float = 120.0) -> dict[str, Any]:
                     f"EXECUTE: {mint[:8]} — {score.position_size_sol:.4f} SOL (permission {score.permission_score}, ordering {score.ordering_score})"
                 )
                 # TODO: Call execute_swap here in live mode
+    
+    # Close red flag client after loop
+    await birdeye_red_flags.close()
     
     # Step 13: Update state with file locking (R5 fix)
     if dry_run:
