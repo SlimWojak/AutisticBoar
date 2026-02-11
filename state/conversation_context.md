@@ -51,6 +51,7 @@ System will auto-trigger heartbeats every 10 minutes via cron. G can also manual
 ## Recent Decisions
 - [02:11 UTC] Created ORIENTATION_HABITS.md — 5-file boot sequence + status check reflex + commit-as-checkpoint pattern
 - [02:11 UTC] Updated BOOTSTRAP.md to reference ORIENTATION_HABITS.md in Normal Boot sequence
+- [02:14 UTC] Tested full boot simulation — 5-file orientation sequence verified working (< 2 sec)
 
 ## Context for Next Spawn
 System is halfway through 10-cycle dry-run validation period. No signals detected in first 5 cycles (quiet market). Cron job now active for automated 10-minute heartbeats. Triangulation tuning v0.2 code deployed and validated. Waiting for market activity to test permission gate + red flags under real conditions.
