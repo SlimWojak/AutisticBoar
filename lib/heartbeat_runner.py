@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,15 +18,30 @@ from lib.clients.birdeye import BirdeyeClient
 from lib.clients.x_api import XClient
 from lib.scoring import ConvictionScorer, SignalInput
 from lib.utils.narrative_tracker import NarrativeTracker
+from lib.utils.async_batch import batch_price_fetch
+from lib.utils.file_lock import safe_read_json, safe_write_json
+from lib.utils.red_flags import check_concentrated_volume
+from lib.skills.warden_check import check_token
 
 
-async def run_heartbeat() -> dict[str, Any]:
-    """Execute full heartbeat cycle."""
+async def run_heartbeat(timeout_seconds: float = 120.0) -> dict[str, Any]:
+    """Execute full heartbeat cycle with time budget.
     
-    # Load state
+    Args:
+        timeout_seconds: Maximum execution time before switching to observe-only mode
+    
+    Returns:
+        Dict with cycle results, errors, and timeout flag
+    """
+    start_time = time.time()
+    
+    # Wrapper to check time budget
+    def time_remaining() -> float:
+        return timeout_seconds - (time.time() - start_time)
+    
+    # Load state with file locking (R5 fix)
     state_path = Path("state/state.json")
-    with open(state_path, 'r') as f:
-        state = json.load(f)
+    state = safe_read_json(state_path)
     
     dry_run = state.get("dry_run_mode", True)
     cycle_num = state.get("dry_run_cycles_completed", 0) + 1
@@ -37,21 +53,75 @@ async def run_heartbeat() -> dict[str, Any]:
         "opportunities": [],
         "decisions": [],
         "errors": [],
+        "exits": [],
+        "timeout_triggered": False,
+        "observe_only": False,
+        "data_completeness": 1.0,
+        "sources_failed": [],
     }
     
+    # Check time budget before starting
+    if time_remaining() < 10:
+        result["timeout_triggered"] = True
+        result["observe_only"] = True
+        result["errors"].append(f"Time budget exhausted before start: {time_remaining():.1f}s remaining")
+        return result
+    
+    # Step 7: Position Watchdog (runs before new signals to handle exits first)
+    if time_remaining() < 10:
+        result["timeout_triggered"] = True
+        result["observe_only"] = True
+        result["errors"].append("Timeout before watchdog step")
+        return result
+    
+    birdeye_watchdog = BirdeyeClient()
+    try:
+        exit_decisions = await asyncio.wait_for(
+            run_position_watchdog(state, birdeye_watchdog),
+            timeout=min(30, time_remaining())
+        )
+        result["exits"] = exit_decisions
+        # TODO: Execute exits in non-dry-run mode
+    except asyncio.TimeoutError:
+        result["errors"].append("Watchdog step timeout")
+        result["timeout_triggered"] = True
+        result["observe_only"] = True
+    except Exception as e:
+        result["errors"].append(f"Watchdog error: {e}")
+    finally:
+        await birdeye_watchdog.close()
+    
     # Step 5: Smart Money Oracle
+    if time_remaining() < 10:
+        result["timeout_triggered"] = True
+        result["observe_only"] = True
+        result["errors"].append("Timeout before oracle step")
+        return result
+    
+    oracle_failed = False
     nansen = NansenClient()
     try:
-        oracle_data = await nansen.get_smart_money_transactions(limit=50)
+        oracle_data = await asyncio.wait_for(
+            nansen.get_smart_money_transactions(limit=50),
+            timeout=min(20, time_remaining())
+        )
         oracle_signals = parse_oracle_signals(oracle_data)
         result["oracle_signals"] = oracle_signals
+    except asyncio.TimeoutError:
+        result["errors"].append("Oracle step timeout")
+        oracle_signals = []
+        oracle_failed = True
+        result["sources_failed"].append("oracle")
     except Exception as e:
         result["errors"].append(f"Oracle error: {e}")
         oracle_signals = []
+        oracle_failed = True
+        result["sources_failed"].append("oracle")
     finally:
         await nansen.close()
     
     # Step 6: Narrative Hunter
+    narrative_failed = False
     birdeye = BirdeyeClient()
     x_client = XClient()
     narrative_tracker = NarrativeTracker()
@@ -76,9 +146,31 @@ async def run_heartbeat() -> dict[str, Any]:
     except Exception as e:
         result["errors"].append(f"Narrative error: {e}")
         narrative_signals = []
+        narrative_failed = True
+        result["sources_failed"].append("narrative")
     finally:
         await birdeye.close()
         await x_client.close()
+    
+    # PARTIAL DATA PENALTY (A2): Calculate data completeness
+    sources_failed_count = len(result["sources_failed"])
+    
+    if sources_failed_count >= 2:
+        # ≥2 primary sources unavailable → OBSERVE-ONLY MODE
+        result["observe_only"] = True
+        result["data_completeness"] = 0.0
+        result["decisions"].append("OBSERVE-ONLY MODE: ≥2 primary sources failed (oracle, narrative)")
+        # Skip entry logic, return early after watchdog
+        return result
+    elif oracle_failed:
+        # Oracle missing → 0.7x penalty (30% reduction)
+        result["data_completeness"] = 0.7
+    elif narrative_failed:
+        # Narrative missing → 0.8x penalty (20% reduction)
+        result["data_completeness"] = 0.8
+    else:
+        # All sources available
+        result["data_completeness"] = 1.0
     
     # Step 9: Conviction Scoring
     scorer = ConvictionScorer()
@@ -89,6 +181,9 @@ async def run_heartbeat() -> dict[str, Any]:
         all_mints.add(sig["token_mint"])
     for sig in narrative_signals:
         all_mints.add(sig["token_mint"])
+    
+    # Create new Birdeye client for red flag checks
+    birdeye_red_flags = BirdeyeClient()
     
     for mint in all_mints:
         # Gather inputs
@@ -106,8 +201,30 @@ async def run_heartbeat() -> dict[str, Any]:
             kol_detected = narrative_sig.get("kol_mentions", 0) > 0
             age_minutes = narrative_tracker.get_age_minutes(mint)
         
-        # Run Rug Warden (stub for now — returns PASS)
-        rug_status = "PASS"  # TODO: integrate actual warden call
+        # Run Rug Warden
+        rug_status = await run_rug_warden(mint)
+        
+        # RED FLAG CHECKS (Phase 3)
+        concentrated_vol = False
+        dumper_count = 0
+        
+        try:
+            # Check concentrated volume
+            trades_data = await birdeye_red_flags.get_trades(mint, limit=100)
+            concentrated_vol, vol_reason = check_concentrated_volume(trades_data)
+        except Exception as e:
+            result["errors"].append(f"Volume concentration check failed for {mint[:8]}: {e}")
+        
+        # TODO: Dumper wallet check requires async wallet history fetching
+        # For now, dumper_count = 0 (stub)
+        
+        # TIME MISMATCH CHECK (Phase 4 / B2)
+        # Oracle accumulation detected + Narrative age <5min → too fast, suspicious
+        time_mismatch_detected = (
+            whales >= 3 and  # Oracle signal present
+            volume_spike >= 5.0 and  # Narrative signal present
+            age_minutes < 5  # Narrative is brand new
+        )
         
         # Score
         signal_input = SignalInput(
@@ -119,13 +236,25 @@ async def run_heartbeat() -> dict[str, Any]:
             edge_bank_match_pct=0.0,  # No beads yet
         )
         
-        score = scorer.score(signal_input, pot_sol=state["current_balance_sol"])
+        score = scorer.score(
+            signal_input, 
+            pot_balance_sol=state["current_balance_sol"],
+            data_completeness=result["data_completeness"],
+            concentrated_volume=concentrated_vol,
+            dumper_wallet_count=dumper_count,
+            time_mismatch=time_mismatch_detected,
+        )
+    
+    await birdeye_red_flags.close()
         
         opportunity = {
             "token_mint": mint,
             "token_symbol": (oracle_sig or narrative_sig or {}).get("token_symbol", "UNKNOWN"),
-            "score": score.total,
+            "ordering_score": score.ordering_score,
+            "permission_score": score.permission_score,
             "breakdown": score.breakdown,
+            "red_flags": score.red_flags,
+            "primary_sources": score.primary_sources,
             "recommendation": score.recommendation,
             "position_size_sol": score.position_size_sol,
             "reasoning": score.reasoning,
@@ -144,27 +273,26 @@ async def run_heartbeat() -> dict[str, Any]:
         if score.recommendation == "VETO":
             result["decisions"].append(f"VETO: {mint[:8]} — {score.reasoning}")
         elif score.recommendation == "DISCARD":
-            result["decisions"].append(f"DISCARD: {mint[:8]} — score {score.total} < 60")
+            result["decisions"].append(f"DISCARD: {mint[:8]} — permission {score.permission_score} < 60")
         elif score.recommendation == "WATCHLIST":
-            result["decisions"].append(f"WATCHLIST: {mint[:8]} — score {score.total} (60-84)")
+            result["decisions"].append(f"WATCHLIST: {mint[:8]} — permission {score.permission_score} (60-84), ordering {score.ordering_score}, primary {len(score.primary_sources)}")
         elif score.recommendation == "AUTO_EXECUTE":
             if dry_run:
                 result["decisions"].append(
-                    f"DRY-RUN LOG: {mint[:8]} — would execute {score.position_size_sol:.4f} SOL (score {score.total})"
+                    f"DRY-RUN LOG: {mint[:8]} — would execute {score.position_size_sol:.4f} SOL (permission {score.permission_score}, ordering {score.ordering_score}, primary {len(score.primary_sources)})"
                 )
             else:
                 result["decisions"].append(
-                    f"EXECUTE: {mint[:8]} — {score.position_size_sol:.4f} SOL (score {score.total})"
+                    f"EXECUTE: {mint[:8]} — {score.position_size_sol:.4f} SOL (permission {score.permission_score}, ordering {score.ordering_score})"
                 )
                 # TODO: Call execute_swap here in live mode
     
-    # Step 13: Update state
+    # Step 13: Update state with file locking (R5 fix)
     if dry_run:
         state["dry_run_cycles_completed"] = cycle_num
     state["last_heartbeat_time"] = datetime.utcnow().isoformat()
     
-    with open(state_path, 'w') as f:
-        json.dump(state, f, indent=2)
+    safe_write_json(state_path, state)
     
     result["state_updated"] = True
     result["next_cycle"] = cycle_num + 1
@@ -219,6 +347,131 @@ def parse_oracle_signals(data: dict[str, Any]) -> list[dict[str, Any]]:
             })
     
     return signals
+
+
+async def run_position_watchdog(
+    state: dict[str, Any],
+    birdeye: BirdeyeClient,
+) -> list[dict[str, Any]]:
+    """Monitor open positions and generate exit decisions.
+    
+    Returns list of exit decisions with reason and percentage.
+    """
+    exit_decisions = []
+    positions = state.get("positions", [])
+    
+    if not positions:
+        return exit_decisions
+    
+    # Batch fetch all position prices (R4 fix: parallel API calls)
+    mints = [pos["token_mint"] for pos in positions]
+    price_data = await batch_price_fetch(birdeye, mints, max_concurrent=3)
+    
+    for pos in positions:
+        mint = pos["token_mint"]
+        entry_price = pos["entry_price"]
+        entry_sol = pos["entry_amount_sol"]
+        peak_price = pos.get("peak_price", entry_price)
+        entry_time = datetime.fromisoformat(pos["entry_time"])
+        
+        # Get refreshed price from batch fetch
+        overview = price_data.get(mint, {})
+        data = overview.get("data", overview)
+        
+        if not data:
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": "Price fetch failed",
+                "exit_pct": 100,
+                "urgency": "high",
+            })
+            continue
+        
+        current_price = float(data.get("price", 0))
+        liquidity = float(data.get("liquidity", 0))
+        
+        # Update peak price if needed
+        if current_price > peak_price:
+            pos["peak_price"] = current_price
+            peak_price = current_price
+        
+        # Calculate PnL
+        pnl_pct = ((current_price - entry_price) / entry_price) * 100
+        peak_drawdown_pct = ((current_price - peak_price) / peak_price) * 100
+        
+        # Position age
+        age_minutes = (datetime.utcnow() - entry_time).total_seconds() / 60
+        
+        # Exit logic
+        # 1. Stop-loss (-20%)
+        if pnl_pct <= -20:
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"Stop-loss hit: {pnl_pct:.1f}%",
+                "exit_pct": 100,
+                "urgency": "critical",
+            })
+        # 2. Take-profit tier 1 (+100%)
+        elif pnl_pct >= 100 and not pos.get("tier1_exited", False):
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"TP tier 1: {pnl_pct:.1f}% (2x)",
+                "exit_pct": 50,
+                "urgency": "normal",
+            })
+            pos["tier1_exited"] = True
+        # 3. Take-profit tier 2 (+400%)
+        elif pnl_pct >= 400 and not pos.get("tier2_exited", False):
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"TP tier 2: {pnl_pct:.1f}% (5x)",
+                "exit_pct": 30,
+                "urgency": "normal",
+            })
+            pos["tier2_exited"] = True
+        # 4. Trailing stop (20% from peak while in profit)
+        elif pnl_pct > 0 and peak_drawdown_pct <= -20:
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"Trailing stop: {peak_drawdown_pct:.1f}% from peak",
+                "exit_pct": 100,
+                "urgency": "high",
+            })
+        # 5. Time decay (no movement after 60min)
+        elif age_minutes >= 60 and abs(pnl_pct) < 5:
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"Time decay: {age_minutes:.0f}min, {pnl_pct:.1f}% PnL",
+                "exit_pct": 100,
+                "urgency": "low",
+            })
+        # 6. Liquidity drop (>50% from entry)
+        elif pos.get("entry_liquidity") and liquidity < pos["entry_liquidity"] * 0.5:
+            exit_decisions.append({
+                "token_mint": mint,
+                "symbol": pos["token_symbol"],
+                "reason": f"Liquidity drop: ${liquidity:,.0f} (was ${pos['entry_liquidity']:,.0f})",
+                "exit_pct": 100,
+                "urgency": "high",
+            })
+    
+    return exit_decisions
+
+
+async def run_rug_warden(mint: str) -> str:
+    """Run Rug Warden check on a token mint."""
+    try:
+        result = await check_token(mint)
+        return result.get("verdict", "FAIL")
+    except Exception as e:
+        # On error, return FAIL to be safe
+        return "FAIL"
 
 
 async def scan_token_narrative(

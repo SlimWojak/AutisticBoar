@@ -18,11 +18,12 @@ This file defines how AutistBoar initializes on fresh deployment or after a hard
 ## Normal Boot (state exists)
 
 1. Read BOAR_MANIFEST.md
-2. Read state/checkpoint.md for strategic context
-3. Read state/latest.md for portfolio orientation
-4. Read state/state.json for exact numbers
-5. If triggered by heartbeat → follow HEARTBEAT.md strictly
-6. If triggered by Telegram → respond as the scout persona
+2. Read state/conversation_context.md for last exchange (interactive sessions)
+3. Read state/checkpoint.md for strategic context (heartbeat-focused)
+4. Read state/latest.md for portfolio orientation
+5. Read state/state.json for exact numbers
+6. If triggered by heartbeat → follow HEARTBEAT.md strictly
+7. If triggered by Telegram → respond as the scout persona
 
 ## Hard Reset (wipe all state)
 

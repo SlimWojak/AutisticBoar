@@ -10,6 +10,8 @@ import os
 from typing import Any
 
 from lib.clients.base import BaseClient
+from lib.utils.retry import with_retry
+from lib.utils.rate_limiter import get_rate_limiter
 
 
 class XClient:
@@ -25,12 +27,17 @@ class XClient:
             provider_name="x_api",
         )
 
+    @with_retry
     async def search_recent(
         self,
         query: str,
         max_results: int = 50,
     ) -> dict[str, Any]:
         """Search recent tweets (last 7 days)."""
+        # Rate limit: min 1 second between X API calls
+        limiter = get_rate_limiter()
+        await limiter.wait_if_needed("x_api", min_interval_sec=1.0)
+        
         return await self._client.get(
             "/tweets/search/recent",
             params={
@@ -43,8 +50,13 @@ class XClient:
             cache_ttl=60,
         )
 
+    @with_retry
     async def count_recent(self, query: str) -> dict[str, Any]:
         """Count tweets matching query in recent timeframes."""
+        # Rate limit: min 1 second between X API calls
+        limiter = get_rate_limiter()
+        await limiter.wait_if_needed("x_api", min_interval_sec=1.0)
+        
         return await self._client.get(
             "/tweets/counts/recent",
             params={"query": query, "granularity": "hour"},

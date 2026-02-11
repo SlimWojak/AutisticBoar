@@ -23,9 +23,12 @@ class SignalInput:
 @dataclass
 class ConvictionScore:
     """Output conviction score with breakdown."""
-    total: int
+    ordering_score: int      # Pure signal strength (for learning)
+    permission_score: int    # After penalties and gates (for action)
     breakdown: Dict[str, int]
-    recommendation: str  # AUTO_EXECUTE, WATCHLIST, DISCARD
+    red_flags: Dict[str, int]  # Negative contributions
+    primary_sources: List[str]  # Which primary sources triggered
+    recommendation: str  # AUTO_EXECUTE, WATCHLIST, DISCARD, VETO
     position_size_sol: float
     reasoning: str
 
@@ -144,7 +147,11 @@ class ConvictionScorer:
         self, 
         signals: SignalInput,
         pot_balance_sol: float,
-        volatility_factor: float = 1.0
+        volatility_factor: float = 1.0,
+        data_completeness: float = 1.0,  # Phase 2: uncertainty multiplier
+        concentrated_volume: bool = False,  # Phase 3: red flag
+        dumper_wallet_count: int = 0,  # Phase 3: red flag
+        time_mismatch: bool = False,  # Phase 4: disagreement flag
     ) -> ConvictionScore:
         """
         Calculate total conviction score and recommendation.
@@ -153,27 +160,76 @@ class ConvictionScorer:
             signals: Input signals from detectors
             pot_balance_sol: Current pot balance in SOL
             volatility_factor: Volatility adjustment (default 1.0)
+            data_completeness: Multiplier for partial data penalty (0.0-1.0)
         
         Returns:
-            ConvictionScore with total, breakdown, and recommendation
+            ConvictionScore with ordering_score, permission_score, and recommendation
         """
         breakdown = {}
+        red_flags = {}
+        primary_sources = []
         reasoning_parts = []
         
-        # RUG WARDEN VETO CHECK (INV-RUG-WARDEN-VETO)
+        # VETO CHECKS (Expanded in Phase 6)
+        
+        # VETO 1: Rug Warden FAIL (INV-RUG-WARDEN-VETO)
         if signals.rug_warden_status == "FAIL":
             return ConvictionScore(
-                total=0,
+                ordering_score=0,
+                permission_score=0,
                 breakdown={"rug_warden": 0},
+                red_flags={},
+                primary_sources=[],
                 recommendation="VETO",
                 position_size_sol=0.0,
-                reasoning="Rug Warden FAIL — trade vetoed (INV-RUG-WARDEN-VETO)"
+                reasoning="VETO: Rug Warden FAIL (INV-RUG-WARDEN-VETO)"
             )
+        
+        # VETO 2: All whales are dumpers (checked in red flag section below)
+        
+        # VETO 3: Token too new (<2min)
+        if signals.narrative_age_minutes < 2 and signals.narrative_volume_spike >= 5.0:
+            return ConvictionScore(
+                ordering_score=0,
+                permission_score=0,
+                breakdown={},
+                red_flags={},
+                primary_sources=[],
+                recommendation="VETO",
+                position_size_sol=0.0,
+                reasoning="VETO: Token created <2min ago (too new for organic discovery)"
+            )
+        
+        # VETO 4: Volume spike ≥10x with near-zero social
+        if (signals.narrative_volume_spike >= 10.0 and 
+            not signals.narrative_kol_detected):
+            # Check if there's truly zero social presence
+            # For now, KOL detection is our proxy for social activity
+            # This veto triggers when there's massive volume but no KOL mentions
+            return ConvictionScore(
+                ordering_score=0,
+                permission_score=0,
+                breakdown={},
+                red_flags={},
+                primary_sources=[],
+                recommendation="VETO",
+                position_size_sol=0.0,
+                reasoning=f"VETO: {signals.narrative_volume_spike:.0f}x volume spike with no social activity (wash trading)"
+            )
+        
+        # VETO 5: Liquidity dropping during detection
+        # This requires passing liquidity delta as a parameter
+        # For now, this veto is handled in Rug Warden checks
+        # TODO: Add liquidity_delta parameter in future enhancement
         
         # Score each signal
         oracle_score, oracle_reason = self.score_smart_money_oracle(signals.smart_money_whales)
         breakdown['smart_money_oracle'] = oracle_score
         reasoning_parts.append(f"Oracle: {oracle_reason}")
+        
+        # PRIMARY SOURCE 1: Oracle (≥3 whales)
+        if signals.smart_money_whales >= 3:
+            primary_sources.append("oracle")
         
         narrative_score, narrative_reason = self.score_narrative_hunter(
             signals.narrative_volume_spike,
@@ -183,31 +239,98 @@ class ConvictionScorer:
         breakdown['narrative_hunter'] = narrative_score
         reasoning_parts.append(f"Narrative: {narrative_reason}")
         
+        # PRIMARY SOURCE 2: Narrative (≥5x volume spike)
+        if signals.narrative_volume_spike >= 5.0:
+            primary_sources.append("narrative")
+        
         warden_score, warden_reason = self.score_rug_warden(signals.rug_warden_status)
         breakdown['rug_warden'] = warden_score
         reasoning_parts.append(f"Warden: {warden_reason}")
+        
+        # PRIMARY SOURCE 3: Rug Warden (PASS or WARN)
+        if signals.rug_warden_status in ["PASS", "WARN"]:
+            primary_sources.append("warden")
         
         edge_score, edge_reason = self.score_edge_bank(signals.edge_bank_match_pct)
         breakdown['edge_bank'] = edge_score
         reasoning_parts.append(f"Edge: {edge_reason}")
         
-        # Total score
-        total = sum(breakdown.values())
+        # ORDERING SCORE: Pure signal strength
+        ordering_score = sum(breakdown.values())
         
-        # Determine recommendation
-        if total >= self.thresholds['auto_execute']:
-            recommendation = "AUTO_EXECUTE"
-        elif total >= self.thresholds['watchlist']:
+        # PERMISSION SCORE: Start with ordering, apply penalties
+        permission_score = ordering_score
+        
+        # RED FLAG 1: Concentrated Volume (B1)
+        if concentrated_volume:
+            penalty = 15
+            red_flags['concentrated_volume'] = -penalty
+            permission_score -= penalty
+            reasoning_parts.append(f"RED FLAG: Concentrated volume (−{penalty} pts)")
+        
+        # RED FLAG 2: Dumper Wallets (B1)
+        if dumper_wallet_count > 0:
+            if dumper_wallet_count >= signals.smart_money_whales and signals.smart_money_whales > 0:
+                # ALL whales are dumpers → VETO
+                return ConvictionScore(
+                    ordering_score=ordering_score,
+                    permission_score=0,
+                    breakdown=breakdown,
+                    red_flags=red_flags,
+                    primary_sources=primary_sources,
+                    recommendation="VETO",
+                    position_size_sol=0.0,
+                    reasoning=f"All {dumper_wallet_count} whale(s) are known dumpers — trade vetoed"
+                )
+            else:
+                # Partial dumpers → gradient penalty
+                if dumper_wallet_count == 1:
+                    penalty = 15
+                else:  # 2+
+                    penalty = 30
+                red_flags['dumper_wallets'] = -penalty
+                permission_score -= penalty
+                reasoning_parts.append(f"RED FLAG: {dumper_wallet_count} dumper wallet(s) (−{penalty} pts)")
+        
+        # Apply data completeness penalty (Phase 2)
+        permission_score = int(permission_score * data_completeness)
+        if data_completeness < 1.0:
+            reasoning_parts.append(f"Data completeness: {data_completeness:.1%}")
+        
+        # PERMISSION GATE (A1): Require ≥2 PRIMARY sources for AUTO_EXECUTE
+        num_primary = len(primary_sources)
+        
+        # Determine base recommendation
+        if permission_score >= self.thresholds['auto_execute']:
+            # CONSTITUTIONAL GATE: AUTO_EXECUTE requires ≥2 PRIMARY sources
+            if num_primary >= 2:
+                recommendation = "AUTO_EXECUTE"
+            else:
+                recommendation = "WATCHLIST"
+                reasoning_parts.append(f"PERMISSION GATE: Only {num_primary} primary source(s) — need ≥2 for AUTO_EXECUTE")
+        elif permission_score >= self.thresholds['watchlist']:
             recommendation = "WATCHLIST"
         else:
             recommendation = "DISCARD"
         
-        # Calculate position size
-        position_size = self.calculate_position_size(total, pot_balance_sol, volatility_factor)
+        # TIME MISMATCH DOWNGRADE (B2): Oracle accumulation + Narrative age <5min
+        if time_mismatch:
+            if recommendation == "AUTO_EXECUTE":
+                recommendation = "WATCHLIST"
+                reasoning_parts.append("TIME MISMATCH: Oracle + Narrative <5min → downgraded to WATCHLIST")
+            elif recommendation == "WATCHLIST":
+                recommendation = "DISCARD"
+                reasoning_parts.append("TIME MISMATCH: Oracle + Narrative <5min → downgraded to DISCARD")
+        
+        # Calculate position size (use permission_score, not ordering)
+        position_size = self.calculate_position_size(permission_score, pot_balance_sol, volatility_factor)
         
         return ConvictionScore(
-            total=total,
+            ordering_score=ordering_score,
+            permission_score=permission_score,
             breakdown=breakdown,
+            red_flags=red_flags,
+            primary_sources=primary_sources,
             recommendation=recommendation,
             position_size_sol=position_size,
             reasoning=" | ".join(reasoning_parts)
@@ -228,6 +351,9 @@ def main():
     parser.add_argument("--edge-match", type=float, default=0.0, help="Edge bank match %")
     parser.add_argument("--pot", type=float, required=True, help="Current pot balance in SOL")
     parser.add_argument("--volatility", type=float, default=1.0, help="Volatility factor")
+    parser.add_argument("--concentrated-vol", action="store_true", help="Volume is concentrated")
+    parser.add_argument("--dumpers", type=int, default=0, help="Number of dumper wallets")
+    parser.add_argument("--time-mismatch", action="store_true", help="Oracle + Narrative <5min")
     
     args = parser.parse_args()
     
@@ -241,11 +367,21 @@ def main():
     )
     
     scorer = ConvictionScorer()
-    result = scorer.score(signals, args.pot, args.volatility)
+    result = scorer.score(
+        signals, 
+        args.pot, 
+        args.volatility,
+        concentrated_volume=args.concentrated_vol,
+        dumper_wallet_count=args.dumpers,
+        time_mismatch=args.time_mismatch,
+    )
     
     output = {
-        "total_score": result.total,
+        "ordering_score": result.ordering_score,
+        "permission_score": result.permission_score,
         "breakdown": result.breakdown,
+        "red_flags": result.red_flags,
+        "primary_sources": result.primary_sources,
         "recommendation": result.recommendation,
         "position_size_sol": round(result.position_size_sol, 4),
         "reasoning": result.reasoning

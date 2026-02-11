@@ -1,0 +1,11 @@
+{
+  "starting_balance_sol": 10.0,
+  "current_balance_sol": 10.0,
+  "dry_run_mode": true,
+  "dry_run_cycles_completed": 4,
+  "dry_run_target_cycles": 10,
+  "positions": [],
+  "daily_exposure_sol": 0.0,
+  "daily_date": "2025-01-01",
+  "last_heartbeat_time": "2026-02-11T00:41:07.789228"
+}

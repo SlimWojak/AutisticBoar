@@ -9,6 +9,7 @@ import os
 from typing import Any
 
 from lib.clients.base import BaseClient
+from lib.utils.retry import with_retry
 
 
 class NansenClient:
@@ -27,6 +28,7 @@ class NansenClient:
             provider_name="nansen",
         )
 
+    @with_retry
     async def get_smart_money_transactions(
         self,
         chain: str = "solana",
@@ -43,6 +45,7 @@ class NansenClient:
             json_data=body,
         )
 
+    @with_retry
     async def get_token_smart_money(self, mint: str) -> dict[str, Any]:
         """Get smart money netflow for a specific token."""
         body = {
@@ -57,6 +60,7 @@ class NansenClient:
             json_data=body,
         )
 
+    @with_retry
     async def get_wallet_profile(self, address: str) -> dict[str, Any]:
         """Get wallet labels (Nansen Profiler API)."""
         body = {"chains": ["solana"], "address": address}
@@ -70,6 +74,25 @@ class NansenClient:
         body = {"chains": ["solana"], "address": address}
         return await self._client.post(
             "/profiler/holdings",
+            json_data=body,
+        )
+    
+    @with_retry
+    async def get_wallet_transaction_history(
+        self, 
+        address: str, 
+        limit: int = 100,
+        days: int = 7
+    ) -> dict[str, Any]:
+        """Get wallet transaction history for dumper detection."""
+        body = {
+            "chains": ["solana"],
+            "address": address,
+            "pagination": {"page": 1, "per_page": limit},
+            "order_by": [{"field": "block_timestamp", "direction": "DESC"}],
+        }
+        return await self._client.post(
+            "/profiler/transactions",
             json_data=body,
         )
 
