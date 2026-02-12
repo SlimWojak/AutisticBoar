@@ -63,6 +63,11 @@ class State(BaseModel):
     last_trade_time: str = ""
     last_heartbeat_time: str = ""
 
+    # Dry-run mode
+    dry_run_mode: bool = False
+    dry_run_cycles_completed: int = 0
+    dry_run_target_cycles: int = 10
+
 
 def load_state() -> State:
     """Load state from disk. Returns default state if file doesn't exist."""

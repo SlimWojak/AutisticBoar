@@ -3,6 +3,13 @@
 Follow these steps IN ORDER on every heartbeat. Do not skip steps.
 Do not improvise. Do not add steps. This is the cycle.
 
+**DELIVERY RULE:** After completing all steps, send your report to Telegram using
+the `message` tool with `to: "915725856"` (G's chat ID). This is required because
+heartbeat runs in an isolated session without automatic Telegram routing.
+NEVER include `NO_REPLY` or `HEARTBEAT_OK` anywhere in your response — these are
+gateway suppression tokens. Every heartbeat MUST end by sending the template from
+step 14 via the message tool.
+
 **CRITICAL:** All commands must run from workspace root with venv active:
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m <module>
@@ -20,7 +27,21 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m <module>
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.killswitch
 ```
-- If status is `ACTIVE` → reply HEARTBEAT_OK immediately. Do nothing else.
+- If status is `ACTIVE` → respond with `🔴 KILLSWITCH ACTIVE — halted` and stop. Do nothing else.
+
+## 1a. Zombie Gateway Check
+```bash
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.zombie_gateway
+```
+- If status is `ZOMBIE` → send via message tool (to: "915725856"): "🔴 CRITICAL: Multiple gateway PIDs detected: {pids}. Stale process causing conflicts. Kill the zombie."
+- Do NOT continue the heartbeat cycle until resolved.
+
+## 1b. Session Health Check
+```bash
+cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.session_health
+```
+- If status is `COLLAPSING` → send via message tool (to: "915725856"): "🟡 WARNING: Session context may be collapsing — {consecutive_short} consecutive short outputs. Consider session reset."
+- Continue the heartbeat cycle (this is a warning, not a halt).
 
 ## 2. State Orientation
 - Read `state/checkpoint.md` for strategic context from the last heartbeat.
@@ -31,8 +52,8 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.killswitch
 ```bash
 cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.guards.drawdown
 ```
-- If status is `HALTED` → reply HEARTBEAT_OK. Do nothing else.
-- If `alert: true` → send Telegram message to G:
+- If status is `HALTED` → respond with `🔴 DRAWDOWN HALT — trading paused` and stop.
+- If `alert: true` → send via message tool (to: "915725856"):
   "🔴 CRITICAL: DRAWDOWN HALT — pot at {current_pct}% of starting. Trading halted for 24h."
 
 ## 4. Risk Limits Check (INV-DAILY-EXPOSURE-30)
@@ -145,23 +166,59 @@ cd /home/autistboar/autisticboar && .venv/bin/python3 -m lib.skills.warden_check
     ```
 
 ## 13. Update State
-- Update `state/state.json` with:
-  - New/closed positions
-  - Updated PnL
-  - Daily exposure
-  - Last heartbeat timestamp
-  - If dry-run: increment `dry_run_cycles_completed`
-- Regenerate `state/latest.md` summary.
+**You MUST write state/state.json every cycle.** Use the write tool to overwrite the full file.
+Minimum fields to update every cycle (even if nothing happened):
+- `last_heartbeat_time`: set to current UTC ISO timestamp
+- `daily_date`: set to today's date (YYYY-MM-DD), reset `daily_exposure_sol` to 0 if date changed
+- If dry-run mode: increment `dry_run_cycles_completed` by 1
 
-## 14. Report
-- **NEVER reply with just "HEARTBEAT_OK"** — always use the template format below (day 1 testing).
+Also update if applicable:
+- `positions`: add/remove based on entries/exits this cycle
+- `current_balance_sol` / `current_balance_usd`: recalculate after trades
+- `daily_exposure_sol`: add any new entry amounts
+- `total_trades`, `total_wins`, `total_losses`: increment on trades
+
+**Example** (no-trade dry-run cycle — still update timestamp and cycle count):
+```json
+{
+  "starting_balance_sol": 14.0,
+  "current_balance_sol": 14.0,
+  "current_balance_usd": 1183.0,
+  "sol_price_usd": 84.5,
+  "positions": [],
+  "daily_exposure_sol": 0.0,
+  "daily_date": "2026-02-12",
+  "daily_loss_pct": 0.0,
+  "consecutive_losses": 0,
+  "halted": false,
+  "halted_at": "",
+  "halt_reason": "",
+  "total_trades": 0,
+  "total_wins": 0,
+  "total_losses": 0,
+  "last_trade_time": "",
+  "last_heartbeat_time": "2026-02-12T08:06:00.000000",
+  "dry_run_mode": true,
+  "dry_run_cycles_completed": 3,
+  "dry_run_target_cycles": 10
+}
+```
+
+## 14. Report — Send to Telegram
+- **Send the report ONCE using the message tool** with `to: "915725856"`.
+- **FORBIDDEN tokens:** `NO_REPLY`, `HEARTBEAT_OK` — never include these anywhere.
+- Compose the report text, then send it ONCE:
+  ```
+  message(action: "send", to: "915725856", message: "<your report text>")
+  ```
+- If the message tool returns `ok: true`, delivery succeeded. **Do NOT retry or send again.**
 - If any trade was executed, position exited, or notable event occurred:
-  → Send full template (🟢 ENTRY / 🟢 EXIT / 🟡 WARNING / 🔴 CRITICAL).
+  → Include full details (🟢 ENTRY / 🟢 EXIT / 🟡 WARNING / 🔴 CRITICAL).
 - If dry-run cycle completed and `dry_run_cycles_completed >= dry_run_target_cycles`:
-  → Send 📊 DIGEST to G with sample scored opportunities from the 10 cycles.
+  → Include 📊 DIGEST with sample scored opportunities from the 10 cycles.
 - If nothing happened (no signals, no positions, no alerts):
   → Send exactly: `🟢 HB #{cycle} | {pot} SOL | 0 pos | no signals | dry-run {n}/10`
-  → Example: `🟢 HB #1 | 14.0 SOL | 0 pos | no signals | dry-run 1/10`
+  → Example: `🟢 HB #3 | 14.0 SOL | 0 pos | no signals | dry-run 3/10`
 
 ## 15. Write Checkpoint (ALWAYS — even on HEARTBEAT_OK)
 Write `state/checkpoint.md` with your current strategic thinking.
@@ -180,11 +237,11 @@ Without it, the next spawn starts cold. Write it EVERY cycle.
 
 ## Post-Heartbeat Checklist
 
-Before replying HEARTBEAT_OK or sending report, verify:
+Before sending your final report (which IS the Telegram message), verify:
 
 - [ ] `state/state.json` updated with latest portfolio numbers
 - [ ] `state/latest.md` regenerated from state.json
 - [ ] `state/checkpoint.md` written with strategic context
 - [ ] If trade executed: autopsy bead written to `beads/`
-- [ ] If notable event: Telegram alert sent to G with tier prefix
+- [ ] If notable event: alert included in response text with tier prefix emoji
 - [ ] If dry-run cycle: `dry_run_cycles_completed` incremented

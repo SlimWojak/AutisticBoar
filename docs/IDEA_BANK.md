@@ -1,21 +1,33 @@
 # Idea Bank
 
-Future enhancements and extensions for AutistBoar. Items are PARKED until core trading loop is validated.
+Future enhancements and extensions for AutistBoar and a8ra. Tagged by readiness:
+- **NOW** — actionable today, low effort, high value (or already proven in production)
+- **AFTER_BEADS** — needs 50+ trade beads or live trading history first
+- **A8RA_ONLY** — pattern research for multi-agent architecture, not Boar priority
 
 ## Ideas
 
-| # | Date       | Idea | Source | Status |
-|---|------------|------|--------|--------|
-| 1 | 2026-02-10 | Telegram inline buttons for >$100 trade approvals — one-tap approve/reject instead of typed responses | G | PARKED — after INV-HUMAN-GATE-100 tested in production |
-| 2 | 2026-02-10 | Multi-token position heat map in daily digest — visual representation of portfolio exposure by sector/narrative | G | PARKED |
-| 3 | 2026-02-10 | Weekly autopsy digest — most valuable beads from the week, pattern synthesis, what worked/what didn't | G | PARKED |
-| 4 | 2026-02-11 | `state/feedback/` directory — structured G approvals/rejections that persist into future heartbeat decisions. Closes the loop between Edge Bank (what happened) and behavioral change (what G thought about it). Pattern validated by shared-context architecture in OpenClaw community. | CTO Claude | PARKED |
-| 5 | 2026-02-11 | Roundtable synthesis in daily digest — not just "what happened" but "what cross-signals emerged across all strategies today." Curator pattern. | CTO Claude | PARKED |
-| 6 | 2026-02-11 | Multi-strategy shared context — when running memecoins + predictions + perps, each strategy writes to its own subdirectory. Strategist (Sonnet) reads across all for cross-signals. | CTO Claude | PARKED |
-| 7 | 2026-02-11 | ChronoBets prediction market skill — place small USDC bets on Pyth oracle markets (BTC/ETH/SOL) as conviction calibration. Prepare/submit pattern fits Blind KeyMan. | G + CTO Claude | PARKED — after core trading loop validated |
-| 8 | 2026-02-10 | Structured reasoning chains at decision time, not just post-trade autopsy. Strategist (Sonnet) outputs logic tree with every trade decision, persisted in bead for fast human review. Pattern: evidence bundle → reasoning chain → decision → G audits the logic, not the trade. | G | PARKED |
-| 9 | 2026-02-11 | Tiered bead context loading (L0/L1/L2) — when Edge Bank beads/ hits 100+ entries, implement manual tiering: `recent.md` (last 10 trades, full detail), `monthly_summary.md` (win rate + patterns, compressed), `archive/` (30+ days old, lightly indexed). Queries hit recent first, fall back to summaries only if needed. Inspired by claw-compactor's progressive context pattern but implemented our way — no lossy compression on trade data. | G + claw-compactor review | PARKED — revisit when beads/ > 50 entries |
-| 10 | 2026-02-11 | SkillRL pattern — replace raw bead retrieval with distilled SkillBank. Opus daily job reads beads, extracts reusable skills (success heuristics + failure avoidance rules), writes to state/skillbank/. Heartbeats retrieve skills not beads. See detailed notes below table. | CTO Claude + SkillRL paper | PARKED — requires 50+ beads before meaningful distillation |
+| # | Date | Idea | Source | Tag |
+|---|------|------|--------|-----|
+| 1 | 2026-02-10 | Telegram inline buttons for >$100 trade approvals — one-tap approve/reject instead of typed responses | G | AFTER_BEADS — needs first live trade to test gate |
+| 2 | 2026-02-10 | Multi-token position heat map in daily digest — visual portfolio exposure by sector/narrative | G | AFTER_BEADS — needs open positions |
+| 3 | 2026-02-10 | Weekly autopsy digest — most valuable beads, pattern synthesis, what worked/what didn't | G | AFTER_BEADS — needs beads |
+| 4 | 2026-02-11 | Feedback directory (`state/feedback/`) — structured G approvals/rejections that persist into future heartbeat decisions. Closes the loop between Edge Bank and behavioral change. [CP-17] | CTO Claude | AFTER_BEADS — needs trades for G to approve/reject |
+| 5 | 2026-02-11 | Roundtable cross-signal synthesis in daily digest — "what cross-signals emerged across all strategies today." Multi-agent curator pattern. [CP-16] | CTO Claude | A8RA_ONLY — multi-strategy prerequisite |
+| 6 | 2026-02-11 | Multi-strategy shared context — each strategy writes to own subdirectory, Strategist reads across all for cross-signals | CTO Claude | A8RA_ONLY |
+| 7 | 2026-02-11 | ChronoBets prediction market skill — small USDC bets on Pyth oracle markets as conviction calibration | G + CTO Claude | AFTER_BEADS — after core loop validated |
+| 8 | 2026-02-10 | Structured reasoning chains at decision time — logic tree with every decision, persisted in bead for human review. Evidence → reasoning → decision → G audits the logic, not the trade. Can prototype on heartbeat cycle decisions, not just trades. Core governance pattern: auditable reasoning. | G | NOW — prototype on heartbeat decisions (a8ra governance pattern) |
+| 9 | 2026-02-11 | Tiered bead context loading (L0/L1/L2) — `recent.md`, `monthly_summary.md`, `archive/`. Queries hit recent first. No lossy compression on trade data. | G | AFTER_BEADS — revisit when beads/ > 50 |
+| 10 | 2026-02-11 | SkillRL distillation — Opus daily job reads beads, extracts reusable success heuristics + failure avoidance rules, writes to `state/skillbank/`. Heartbeats retrieve skills not beads. The learning flywheel. See detailed notes below. [CP-10] | CTO Claude + SkillRL paper | AFTER_BEADS — needs 50+ beads |
+| 11 | 2026-02-12 | Agent role registry — agents need to know who they are, what they can touch, who else is operating. Boar inherited a self-preservation rule that applied to himself but confused an external operator (Opus/Cursor). A8ra needs an agent manifest per role with explicit scope boundaries. | G + Opus | A8RA_ONLY — architecture pattern for multi-agent |
+| 12 | 2026-02-12 | Session context collapse detection — cheap models (DeepSeek) latch onto shortest patterns in accumulating sessions. Known failure mode: heartbeat outputs shrink to 5 tokens, gateway marks silent. Fix: nuke session file + restart. Applicable to any agent running recurring loops. Documented in AGENTS.md. **BUILT:** `lib/guards/session_health.py`, wired into HEARTBEAT.md step 1b. | Opus (proven in production) | NOW — BUILT + deployed |
+| 13 | 2026-02-12 | systemd over tmux for production agents — supervised processes with auto-restart, journal logging, `EnvironmentFile` for env vars. Proven superior to tmux/screen sessions that die silently. | G + Opus | NOW — already deployed, document as standard |
+| 14 | 2026-02-12 | EnvironmentFile with secret isolation — load API keys via systemd `EnvironmentFile` but keep signer private keys OUT of the file entirely. Signer subprocess reads key from its own isolated path. Defence in depth for INV-BLIND-KEY. | Opus | NOW — already deployed, verify isolation |
+| 15 | 2026-02-12 | Zombie process detection — stale gateway from prior era caused Telegram auth failures and API conflicts. Health check verifies only one gateway PID is running. **BUILT:** `lib/guards/zombie_gateway.py`, wired into HEARTBEAT.md step 1a. | Opus (learned from outage) | NOW — BUILT + deployed |
+| 16 | 2026-02-12 | Red Team / Challenger agent — adversarial model argues against high-conviction trades before execution. Devil's advocate gate between conviction scoring and trade execution. [CP-11] | v0.2 broadcast | AFTER_BEADS — needs live trading + conviction data |
+| 17 | 2026-02-12 | World Surface / War Room — structured projection layer (Linear/Asana style) over canonical state. Invariants: surface reads from state, never writes. State is canonical, surface is derived. [CP-14] | v0.2 broadcast | A8RA_ONLY — needs multi-agent coordination |
+| 18 | 2026-02-12 | GPT-5.3 Codex as coding delegate — Sonnet writes spec, Codex implements, Sonnet reviews. Separates architecture from implementation. [CP-15] | v0.2 broadcast | A8RA_ONLY — tooling pattern, not Boar priority |
+| 19 | 2026-02-12 | Agent Board (LobeHub) as MCP surface layer experiment. Test whether projecting Boar's candidate pipeline onto an agent-native Kanban (with DAG dependencies and MCP tool exposure) improves agent orientation vs the current filesystem world model. Two-layer architecture: Agent Board as inner surface for agents, Linear as optional outer surface for humans. Invariants: INV-WORLD-AUTHORITY-1 through INV-FAIL-OPEN-SURFACE-1 apply. Ref: Perplexity research doc on world surface options. | G | A8RA_ONLY — world surface experiment, tests orientation pattern |
 
 ## Selection Criteria
 

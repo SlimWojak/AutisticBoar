@@ -1,65 +1,46 @@
 # Conversation Context
 
-**Last Updated:** 2026-02-11 01:32 UTC
-**Topic:** Dry-run validation period active with automated heartbeat cron
-**Status:** 🟢 CYCLE 5/10 COMPLETE
+**Last Updated:** 2026-02-12 08:15 UTC
+**Topic:** Post-outage recovery — heartbeat operational, dry-run reset
+**Status:** 🟢 OPERATIONAL — heartbeat delivering to Telegram
 
-## Current Topic
-Dry-run validation period for triangulation tuning v0.2 — testing asymmetric risk changes under real market conditions.
+## Current State
 
-## Pending Decisions
-- [ ] Complete remaining 5 dry-run cycles (cycles 6-10)
-- [ ] Review beads and validate Gates A-C after cycle 10
-- [ ] Decide: go live or adjust thresholds
-
-## Recent Proposals
-1. ✅ **Triangulation tuning v0.2 complete** — all 6 phases implemented
-2. ✅ **Repo hygiene complete** — all changes committed to GitHub (commit 540c1c8)
-3. ✅ **Dry-run activated** — currently in cycle 5/10
-4. ✅ **Cron job configured** — 10-minute heartbeat schedule active (job id: 22bd4ed4-df98-4d11-a00d-e975f47808ed)
-
-## Dry-Run Progress
-
-**Cycles Completed:** 5/10 (50%)
-
-| Cycle | Timestamp | Signals | Opportunities | Decisions | Notes |
-|-------|-----------|---------|---------------|-----------|-------|
-| 1 | 2026-02-10 23:xx | 0 | 0 | - | Quiet market |
-| 2 | 2026-02-10 23:xx | 0 | 0 | - | Quiet market |
-| 3 | 2026-02-10 23:xx | 0 | 0 | - | Quiet market |
-| 4 | 2026-02-11 00:25 | 0 | 0 | - | Quiet market |
-| 5 | 2026-02-11 01:20 | 0 | 0 | - | Quiet market, syntax fix deployed |
-
-**Current State:**
-- Pot: 14.0 SOL ($1,183 @ $84.50/SOL)
+- Pot: 14.0 SOL ($1,183)
 - Positions: 0 open
-- Daily exposure: 0.0 SOL
-- System status: Healthy, no errors
+- Mode: DRY RUN (cycle 0/10 — reset after session collapse fix)
+- Heartbeat: native OpenClaw, every 10m, DeepSeek R1, delivering to Telegram
+- No cron jobs. Native heartbeat only. See AGENTS.md "Heartbeat Operations" section.
 
-**Heartbeat Reporting:**
-- ✅ **FIXED:** Cron job now configured for 10-minute heartbeats
-- ✅ **FIXED:** HEARTBEAT.md compliance — always use template format (not just "HEARTBEAT_OK")
-- Next heartbeat: ~10 minutes from 01:32 UTC (approx 01:42 UTC)
+## What Happened (2026-02-12 outage)
 
-**Known Issues:**
-- ✅ **FIXED:** Indentation error in heartbeat_runner.py (line 250) — resolved 2026-02-11 01:21 UTC
-- ✅ **FIXED:** Missing cron job for automated heartbeats — resolved 2026-02-11 01:32 UTC
+Gateway was down since Feb 10 evening. Restarted Feb 12 05:31 UTC via systemd.
+Three issues discovered and fixed:
+1. **Birdeye 401** — API key had expired. Fixed by G in `.env`.
+2. **Telegram bot token missing** — not loaded at first restart. Fixed via `EnvironmentFile`.
+3. **Session context collapse** — DeepSeek latched onto "HEARTBEAT_OK" pattern from
+   accumulated session history. 8+ hours of silent heartbeats (firing but not delivering).
+   Root cause: polluted session + permissive prompt. Fixed by: nuking session file,
+   hardening prompt (no HEARTBEAT_OK escape), gateway restart.
 
-## Next Action
-System will auto-trigger heartbeats every 10 minutes via cron. G can also manually trigger cycles anytime.
+Full forensic documented in AGENTS.md under "Heartbeat Operations (Lessons Learned)".
 
 ## Recent Decisions
-- [02:11 UTC] Created ORIENTATION_HABITS.md — 5-file boot sequence + status check reflex + commit-as-checkpoint pattern
-- [02:11 UTC] Updated BOOTSTRAP.md to reference ORIENTATION_HABITS.md in Normal Boot sequence
-- [02:14 UTC] Tested full boot simulation — 5-file orientation sequence verified working (< 2 sec)
-- [03:48 UTC] **REGRESSION FIX:** Deleted redundant cron job (created in commit 23166e7)
-  - Root cause: Confusion between native heartbeat vs cron jobs
-  - Native heartbeat (openclaw.json) routes to DeepSeek ✅
-  - Cron job was hitting Sonnet, causing "reminder not found" errors ❌
-  - Cron jobs are for reminders/wake events ONLY, not heartbeats
-  - Updated AGENTS.md, ROUTING.md, BOOTSTRAP.md, ORIENTATION_HABITS.md with warnings
+
+- [08:00 UTC] Heartbeat prompt hardened — must read HEARTBEAT.md, execute full checklist, report with template. No lazy exit ramp.
+- [07:58 UTC] Session `main` confirmed as required — changing to `heartbeat` breaks Telegram routing (no chat association).
+- [07:42 UTC] Gateway restarted by Opus (external operator via Cursor SSH). Boar cannot restart his own gateway (Self-Preservation rule).
+- [08:10 UTC] `dry_run_mode`, `dry_run_cycles_completed`, `dry_run_target_cycles` added to state.json (were missing).
+- [08:12 UTC] HEARTBEAT.md step 13 rewritten with explicit state.json write example for DeepSeek.
 
 ## Context for Next Spawn
-System is halfway through 10-cycle dry-run validation period. No signals detected in first 5 cycles (quiet market). Cron job now active for automated 10-minute heartbeats. Triangulation tuning v0.2 code deployed and validated. Waiting for market activity to test permission gate + red flags under real conditions.
 
-**NEW:** Orientation habits implemented to fix short-term memory loss — future spawns should run 5-file boot sequence and inline state checks before answering status questions.
+System is operational. Heartbeat delivering to Telegram. Dry-run counter reset to 0/10 after
+session nuke. AGENTS.md contains full heartbeat ops knowledge (session collapse, prompt
+discipline, diagnostic commands). No cron jobs exist or should be created. `state/state.json`
+now has dry_run fields. DeepSeek should increment `dry_run_cycles_completed` each cycle
+per HEARTBEAT.md step 13.
+
+**Meta-context:** AutistBoar is a live-fire R&D testbed for a8ra. Trading PnL is secondary.
+Primary output is the pattern library: governance, orchestration, orientation, resilience,
+cost optimisation, sovereign interface. Every bug fixed = a pattern documented.
