@@ -84,9 +84,17 @@ Python Execution Layer (lib/)
 
 ~$310-380/mo total (APIs + VPS + LLM). See `docs/BUILD_PLAN_v0.2.md` for breakdown.
 
+## Contributing
+
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- How to fork the repository
+- Development setup and guidelines
+- Pull request process
+- Security considerations
+
 ## License
 
-Private. Not for distribution.
+Private. Not for distribution. Forks permitted for development and contribution purposes only.
 
 ---
 
